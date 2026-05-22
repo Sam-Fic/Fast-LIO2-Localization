@@ -1,7 +1,7 @@
 /**:
     ros__parameters:
         locate_in_prior_map: true
-        prior_map_path: "/home/sentry_ws/src/FAST_LIO_SAM/PCD/GlobalMap.pcd"
+        prior_map_path: "/home/rc/fastlio_localization_ws/src/FAST_LIO/PCD/map.pcd"
         feature_extract_enable: false
         point_filter_num: 3
         max_iteration: 3
@@ -15,9 +15,10 @@
             odom_frame_id: "odom"
             sensor_frame_id: "imu_link"
             base_frame_id: "base_link"
-            send_odom_base_tf: true
+            send_odom_base_tf: false
             lid_topic:  "/livox/lidar"
-            imu_topic:  "/imu/data"
+            # imu_topic:  "/imu/data"
+            imu_topic:  "/livox/imu"    # For livox MID-360
             time_sync_en: false         # ONLY turn on when external time synchronization is really not possible
             time_offset_lidar_to_imu: 0.0 # Time offset between lidar and IMU calibrated by other algorithms, e.g. LI-Init (can be found in README).
                                         # This param will take effect no matter what time_sync_en is. So if the time offset is not known exactly, please set as 0.0

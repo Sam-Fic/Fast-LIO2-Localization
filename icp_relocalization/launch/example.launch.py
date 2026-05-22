@@ -37,27 +37,14 @@ def generate_launch_description():
           {'solver_max_iter':100},
           {'max_correspondence_distance':1.0},
           {'RANSAC_outlier_rejection_threshold':0.5},
-          # {'map_path':'/home/sentry_ws/src/sentry_bringup/maps/CC#0.pcd'},
-          {'map_path':'/home/rc/fastlio_localization_ws/src/FAST_LIO/PCD/map.pcd'},     # Use absolute paths
+        #   {'map_path':'/home/rc/fastlio_localization_ws/src/FAST_LIO/PCD/map.pcd'},
+          {'map_path':'/home/rc/livox_mapping_ws/src/FAST_LIO_ROS2/PCD/test.pcd'},
           {'fitness_score_thre':5.0}, # 是最近点距离的平均值，越小越严格
           {'converged_count_thre':40}, # pcl pub at 20 hz, 2s
           {'pcl_type':'livox'},
       ],
   )
-  
-  # fast-lio localization   
-  fast_lio_param = os.path.join(
-      config_path, 'fast_lio_relocalization_param.yaml')
-  fast_lio_node = Node(
-      package='fast_lio',
-      executable='fastlio_mapping',
-      parameters=[
-          fast_lio_param
-      ],
-      output='screen',
-      remappings=[('/Odometry','/state_estimation')]
-  )
-        
+          
   rviz_config_file = os.path.join(
     get_package_share_directory('icp_relocalization'), 'rviz', 'loam_livox.rviz')
   start_rviz = Node(
@@ -67,18 +54,13 @@ def generate_launch_description():
     output='screen'
   )
 
-  delayed_start_lio = TimerAction(
-    period=5.0,
-    actions=[
-      icp_node,
-      fast_lio_node
-    ]
-  )
-
   ld = LaunchDescription()
 
   ld.add_action(map_odom_trans)
+  ld.add_action(icp_node)
   ld.add_action(start_rviz)
-  ld.add_action(delayed_start_lio)
 
   return ld
+
+
+

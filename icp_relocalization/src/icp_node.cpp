@@ -150,13 +150,7 @@ private:
 
         if (fitness_score < fitness_score_thre && icp.hasConverged())
         {
-            converged_count++;
-            RCLCPP_INFO(this->get_logger(), "ICP converged, count: %d", converged_count);
-            if(converged_count < converged_count_thre)
-            {
-                RCLCPP_INFO(this->get_logger(), "ICP converged, but not enough count, no pose is published");
-                return;
-            }
+            RCLCPP_INFO(this->get_logger(), "ICP converged with fitness score: %f", fitness_score);
             // Convert the transformation_result result to a PoseWithCovarianceStamped message and publish it
             Eigen::Matrix4f transformation_result = icp.getFinalTransformation();
             geometry_msgs::msg::PoseWithCovarianceStamped pose_msg;
@@ -173,6 +167,9 @@ private:
             pose_msg.pose.pose.orientation.z = q.z();
             pose_msg.pose.pose.orientation.w = q.w();
             publisher_->publish(pose_msg);
+            
+            // Update the initial guess with the ICP result for next iteration
+            initGuess = transformation_result;
 
             // Transform the input cloud using the ICP result
             pcl::transformPointCloud(*input_cloud, *input_cloud, transformation_result);
@@ -182,11 +179,10 @@ private:
             transformed_cloud_msg.header.stamp = this->now();
             transformed_cloud_msg.header.frame_id = map_frame;
             transformed_cloud_pub_->publish(transformed_cloud_msg);
-            rclcpp::shutdown();
         }
         else
         {
-            converged_count = 0;
+            // Keep using the current initial guess
             Eigen::Matrix4f transformation_result = initGuess;
             pcl::transformPointCloud(*input_cloud, *input_cloud, transformation_result);
             // Publish the transformed input cloud
@@ -195,7 +191,7 @@ private:
             transformed_cloud_msg.header.stamp = this->now();
             transformed_cloud_msg.header.frame_id = map_frame;
             transformed_cloud_pub_->publish(transformed_cloud_msg);
-            RCLCPP_INFO(this->get_logger(), "ICP fitness score is higher than the threshold, no pose is published");
+            RCLCPP_INFO(this->get_logger(), "ICP fitness score is higher than the threshold or not converged, no pose is published");
         }
         target_cloud_msg.header.stamp = this->now();
         map_pub_->publish(target_cloud_msg);
@@ -246,9 +242,9 @@ private:
         double fitness_score = icp.getFitnessScore();
         RCLCPP_INFO(this->get_logger(), "ICP fitness score: %f", fitness_score);
 
-        if (icp.hasConverged() && fitness_score < fitness_score_thre && converged_count > converged_count_thre)
+        if (icp.hasConverged() && fitness_score < fitness_score_thre)
         {
-            RCLCPP_INFO(this->get_logger(), "ICP converged!!!");
+            RCLCPP_INFO(this->get_logger(), "ICP converged with fitness score: %f", fitness_score);
             Eigen::Matrix4f transformation_result = icp.getFinalTransformation();
             // Convert the transformation_result result to a PoseWithCovarianceStamped message and publish it
             geometry_msgs::msg::PoseWithCovarianceStamped pose_msg;
@@ -265,36 +261,29 @@ private:
             pose_msg.pose.pose.orientation.z = q.z();
             pose_msg.pose.pose.orientation.w = q.w();
             publisher_->publish(pose_msg);
+            
+            // Update the initial guess with the ICP result for next iteration
+            initGuess = transformation_result;
 
             // Transform the input cloud using ICP result
             pcl::transformPointCloud(*input_cloud, *input_cloud, transformation_result);
-            // Publish the transformed input cloud for the last time
+            // Publish the transformed input cloud
             sensor_msgs::msg::PointCloud2 transformed_cloud_msg;
             pcl::toROSMsg(*input_cloud, transformed_cloud_msg);
             transformed_cloud_msg.header.stamp = this->now();
             transformed_cloud_msg.header.frame_id = map_frame;
             transformed_cloud_pub_->publish(transformed_cloud_msg);
-            rclcpp::shutdown();
         }
-        else if(icp.hasConverged() && fitness_score < fitness_score_thre && converged_count <= converged_count_thre)
+        else
         {
-            converged_count++;
-            initGuess = icp.getFinalTransformation(); // update the initial guess with the ICP result
+            // Keep using the current initial guess
+            if (icp.hasConverged()) {
+                initGuess = icp.getFinalTransformation(); // update the initial guess with the ICP result
+                RCLCPP_INFO(this->get_logger(), "ICP converged with high error: %f, no pose is published", fitness_score);
+            } else {
+                RCLCPP_INFO(this->get_logger(), "ICP doesn't converge!!!");
+            }
             pcl::transformPointCloud(*input_cloud, *input_cloud, initGuess);
-            RCLCPP_INFO(this->get_logger(), "ICP converged with low error, but not enough count, no pose is published");
-        }
-        else if(icp.hasConverged() && fitness_score >= fitness_score_thre)
-        {
-            converged_count = 0;
-            initGuess = icp.getFinalTransformation(); // update the initial guess with the ICP result
-            pcl::transformPointCloud(*input_cloud, *input_cloud, initGuess);
-            RCLCPP_INFO(this->get_logger(), "ICP converged with high error, no pose is published");
-        }
-        else // if ICP doesn't converge
-        {
-            converged_count = 0;
-            pcl::transformPointCloud(*input_cloud, *input_cloud, initGuess);
-            RCLCPP_INFO(this->get_logger(), "ICP doesn't converge!!!");
         }
 
         // Publish the transformed input cloud
@@ -359,6 +348,6 @@ int main(int argc, char *argv[])
 {
     rclcpp::init(argc, argv);
     rclcpp::spin(std::make_shared<ICPNode>());
-    rclcpp::shutdown();
+    // rclcpp::shutdown();
     return 0;
 }
